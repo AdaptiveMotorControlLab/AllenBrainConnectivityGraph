@@ -355,7 +355,7 @@ class MainWindow(QMainWindow):
         edge_widths = [w * (arrow_size / 10) for w in norm_edge_widths]
 
         # Draw nodes
-        nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax)
+        nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax, alpha=0.6)
 
         # Draw edges
         nx.draw_networkx_edges(
@@ -366,7 +366,7 @@ class MainWindow(QMainWindow):
             width=edge_widths,
             edge_color=self.edge_colors,
             connectionstyle='arc3, rad=-.1',  # Straight lines
-            ax=ax
+            ax=ax,
         )
 
         # Draw labels
