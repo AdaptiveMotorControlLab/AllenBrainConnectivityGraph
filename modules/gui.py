@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Brain Connectivity Visualization")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(50, 50, 1200, 1000) # The 4 dimensions correspond to x, y, width, height
 
         # Initialize selected_acronyms
         self.selected_acronyms = ['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs']
@@ -71,13 +71,18 @@ class MainWindow(QMainWindow):
         self.selected_regions_display = QTextEdit()
         self.selected_regions_display.setReadOnly(True)
         self.selected_regions_display.setFixedHeight(80)  # Adjust height as needed
+        
+        # Button to clear selections
+        self.clear_selections_button = QPushButton("Clear Selections")
+        self.clear_selections_button.clicked.connect(self.clear_selections)
 
         # Dropdown for projection measure
         self.proj_label = QLabel("Select Projection Measure:")
         self.proj_combo = QPushButton("Select Projection Measure")
         self.proj_combo_menu = self.create_proj_combo_menu()
         self.proj_combo.setMenu(self.proj_combo_menu)
-        self.selected_proj_measure = 'projection_volume'  # Default selection
+        self.selected_proj_measure = 'projection_energy'  # Default selection
+        self.setWindowTitle(f"Brain Connectivity Visualization \n {self.selected_proj_measure}")
 
         # Checkbox for including descendants
         self.descendants_checkbox = QCheckBox("Include Descendants")
@@ -117,24 +122,39 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.region_table_scroll, 1, 0, 1, 2)
         self.layout.addWidget(self.current_selection_label, 2, 0)
         self.layout.addWidget(self.selected_regions_display, 2, 1)
-        self.layout.addWidget(self.proj_label, 3, 0)
-        self.layout.addWidget(self.proj_combo, 3, 1)
-        self.layout.addWidget(self.descendants_checkbox, 4, 0, 1, 2)
-        self.layout.addWidget(self.arrow_size_label, 5, 0)
-        self.layout.addWidget(self.arrow_size_slider, 5, 1)
-        self.layout.addWidget(self.run_button, 6, 0, 1, 2)
-        self.layout.addWidget(self.toolbar, 7, 0, 1, 2)
-        self.layout.addWidget(self.canvas, 8, 0, 1, 2)
-        self.layout.addWidget(self.save_button, 9, 0)
-        self.layout.addWidget(self.transparent_checkbox, 9, 1)
+        self.layout.addWidget(self.clear_selections_button, 3, 0, 1, 1) # The 4 numbers of addWidget function correspond to row, column, rowSpan, columnSpan
+        self.layout.addWidget(self.proj_label, 4, 0)
+        self.layout.addWidget(self.proj_combo, 4, 1)
+        self.layout.addWidget(self.descendants_checkbox, 5, 0, 1, 2)
+        self.layout.addWidget(self.arrow_size_label, 6, 0)
+        self.layout.addWidget(self.arrow_size_slider, 6, 1)
+        self.layout.addWidget(self.run_button, 7, 0, 1, 2)
+        self.layout.addWidget(self.toolbar, 8, 0, 1, 2)
+        self.layout.addWidget(self.canvas, 9, 0, 1, 2)
+        self.layout.addWidget(self.save_button, 10, 0)
+        self.layout.addWidget(self.transparent_checkbox, 10, 1)
 
         # Load initial data
         self.load_region_acronyms()
 
+    def clear_selections(self):
+        # Clear the selected_acronyms list
+        self.selected_acronyms.clear()
+
+        # Uncheck all checkboxes in the region table
+        for row in range(self.region_table.rowCount()):
+            for col in range(self.region_table.columnCount()):
+                item = self.region_table.item(row, col)
+                if item and item.flags() & Qt.ItemIsUserCheckable:
+                    item.setCheckState(Qt.Unchecked)
+
+        # Update the selected regions display
+        self.selected_regions_display.clear()
+
     def create_proj_combo_menu(self):
         from PyQt5.QtWidgets import QMenu, QAction
         menu = QMenu()
-        measures = ['projection_volume', 'projection_density', 'projection_energy']
+        measures = ['normalized_projection_volume','projection_volume', 'projection_density', 'projection_energy']
         for measure in measures:
             action = QAction(measure, self)
             action.triggered.connect(lambda checked, m=measure: self.set_proj_measure(m))
@@ -329,7 +349,7 @@ class MainWindow(QMainWindow):
             self.G, self.pos,
             edgelist=self.edges,
             arrowstyle='-|>',
-            arrowsize=15,
+            arrowsize=self.arrow_size_slider.value(),
             width=edge_widths,
             edge_color=self.edge_colors,
             connectionstyle='arc3, rad=-.1',  # Straight lines
@@ -345,7 +365,7 @@ class MainWindow(QMainWindow):
         self.figure.colorbar(sm, label='Connection Strength (log scale)', ax=ax)
 
         # Set title and axis off
-        ax.set_title('Bidirectional Connectivity Map')
+        ax.set_title(f'Bidirectional Connectivity Map \n {self.selected_proj_measure}')
         ax.axis('off')
 
         # Refresh the canvas
