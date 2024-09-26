@@ -446,7 +446,7 @@ class MainWindow(QMainWindow):
             if vmin >= vmax:
                 raise ValueError("vmin must be less than vmax.")
 
-            self.vmin = 0#vmin
+            self.vmin = vmin
             self.vmax = vmax
 
             self.update_arrow_size()
@@ -460,8 +460,9 @@ class MainWindow(QMainWindow):
         self.update_arrow_size()
 
     def update_arrow_size(self):
-        if not hasattr(self, 'G'):
-            return  # No graph to update
+        # Check if the necessary attributes are available
+        if not hasattr(self, 'G') or not hasattr(self, 'log_weights'):
+            return  # No graph to update or data to use
 
         # Get new arrow size
         arrow_size = self.arrow_size_slider.value()
@@ -491,17 +492,28 @@ class MainWindow(QMainWindow):
         norm = plt.Normalize(self.vmin, self.vmax)
         self.edge_colors = [self.cmap(norm(lw)) for lw in self.log_weights]
 
+        # **Add this code to filter edges based on the threshold**
+        threshold = self.vmin  # or set a specific threshold value
+        edges_to_draw = []
+        edge_colors_to_draw = []
+        edge_widths_to_draw = []
+        for edge, color, width, lw in zip(self.edges, self.edge_colors, edge_widths, self.log_weights):
+            if lw >= threshold:
+                edges_to_draw.append(edge)
+                edge_colors_to_draw.append(color)
+                edge_widths_to_draw.append(width)
+
         # Draw nodes
         nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax, alpha=0.6)
 
-        # Draw edges
+        # **Modify the draw call to use the filtered edges**
         nx.draw_networkx_edges(
             self.G, self.pos,
-            edgelist=self.edges,
+            edgelist=edges_to_draw,
             arrowstyle='-|>',
-            arrowsize=self.arrow_size_slider.value(),
-            width=edge_widths,
-            edge_color=self.edge_colors,
+            arrowsize=arrow_size,
+            width=edge_widths_to_draw,
+            edge_color=edge_colors_to_draw,
             connectionstyle='arc3, rad=-.1',  # Straight lines
             ax=ax,
         )
