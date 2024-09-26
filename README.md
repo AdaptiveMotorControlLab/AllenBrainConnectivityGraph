@@ -25,3 +25,8 @@ pip install -r requirements.txt
 ```bash
 python main.py
 ```
+
+## App overview
+<p align="center">
+  <img src="data/AllenBrainConnectivityApp.gif" alt="GIF Animation">
+</p>
