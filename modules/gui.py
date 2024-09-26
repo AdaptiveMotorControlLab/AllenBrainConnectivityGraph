@@ -7,11 +7,11 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QFileDialog,QMessageBox,
     QCheckBox, QSlider, QGridLayout, QLineEdit, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea,
-    QComboBox  # New import for the connection type selector
+    QComboBox
 )
 from PyQt5.QtCore import Qt, QTimer
 import os
-# Matplotlib imports for embedding in PyQt5
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         self.arrow_size_slider.setValue(10)
         self.arrow_size_slider.valueChanged.connect(self.update_arrow_size)
 
-        # New: Add a slider for arrow width scaling
+        # Add a slider for arrow width scaling
         self.arrow_width_label = QLabel("Arrow Width Scaling:")
         self.arrow_width_slider = QSlider(Qt.Horizontal)
         self.arrow_width_slider.setMinimum(1)
@@ -128,18 +128,18 @@ class MainWindow(QMainWindow):
         self.arrow_width_slider.setValue(10)
         self.arrow_width_slider.valueChanged.connect(self.update_arrow_size)
 
-        # New: Add a combo box for connection type selection
+        # Add a combo box for connection type selection
         self.connection_type_label = QLabel("Connection Type:")
         self.connection_type_combo = QComboBox()
         self.connection_type_combo.addItems(["All Connections", "Afferent to Selected", "Efferent from Selected"])
         
-        # New: Add a combo box for target/source region selection
+        # Add a combo box for target/source region selection
         self.target_source_label = QLabel("Target/Source Region:")
         self.target_source_combo = QComboBox()
         self.target_source_combo.addItems(self.selected_acronyms)
         self.target_source_combo.setEnabled(False)  # Initially disabled
 
-        # New: Connect the connection type combo box to an update function
+        # Connect the connection type combo box to an update function
         self.connection_type_combo.currentIndexChanged.connect(self.update_target_source_combo)
         
         # Add new UI elements for colormap range
@@ -193,7 +193,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.descendants_checkbox, 5, 0, 1, 2)
         self.layout.addWidget(self.arrow_size_label, 6, 0)
         self.layout.addWidget(self.arrow_size_slider, 6, 1)
-        # New: Add new widgets to the layout
+
         self.layout.addWidget(self.arrow_width_label, 7, 0)
         self.layout.addWidget(self.arrow_width_slider, 7, 1)
         self.layout.addWidget(self.connection_type_label, 8, 0)
@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.canvas, 12, 0, 1, 2)
         self.layout.addWidget(self.save_button, 13, 0)
         self.layout.addWidget(self.transparent_checkbox, 13, 1)
-        # Add new UI elements to the layout
+
         self.layout.addWidget(self.vmin_label, 14, 0)
         self.layout.addWidget(self.vmin_input, 14, 1)
         self.layout.addWidget(self.vmax_label, 15, 0)
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         # Load initial data
         self.load_region_acronyms()
 
-    # New: Method to update target/source combo box based on connection type
+    # Method to update target/source combo box based on connection type
     def update_target_source_combo(self):
         connection_type = self.connection_type_combo.currentText()
         if connection_type in ["Afferent to Selected", "Efferent from Selected"]:
@@ -492,7 +492,6 @@ class MainWindow(QMainWindow):
         norm = plt.Normalize(self.vmin, self.vmax)
         self.edge_colors = [self.cmap(norm(lw)) for lw in self.log_weights]
 
-        # **Add this code to filter edges based on the threshold**
         threshold = self.vmin  # or set a specific threshold value
         edges_to_draw = []
         edge_colors_to_draw = []
@@ -506,7 +505,7 @@ class MainWindow(QMainWindow):
         # Draw nodes
         nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax, alpha=0.6)
 
-        # **Modify the draw call to use the filtered edges**
+        # Modify the draw call to use the filtered edges
         nx.draw_networkx_edges(
             self.G, self.pos,
             edgelist=edges_to_draw,
@@ -514,7 +513,7 @@ class MainWindow(QMainWindow):
             arrowsize=arrow_size,
             width=edge_widths_to_draw,
             edge_color=edge_colors_to_draw,
-            connectionstyle='arc3, rad=-.1',  # Straight lines
+            connectionstyle='arc3, rad=-.1',  # rad=0, Straight lines
             ax=ax,
         )
 
