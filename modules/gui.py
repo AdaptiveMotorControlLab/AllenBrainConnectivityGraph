@@ -3,8 +3,9 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QFileDialog, QCheckBox, QSlider, QSpinBox, QGridLayout
+    QHBoxLayout, QLabel, QPushButton, QFileDialog,
+    QCheckBox, QSlider, QGridLayout, QLineEdit, QTableWidget,
+    QTableWidgetItem, QAbstractItemView
 )
 from PyQt5.QtCore import Qt
 
@@ -19,12 +20,16 @@ import numpy as np
 
 from modules.data_processing import structure_tree, get_projection_data
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Brain Connectivity Visualization")
         self.setGeometry(100, 100, 1200, 800)
+
+        # Initialize selected_acronyms
+        self.selected_acronyms = set(['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs'])
 
         # Initialize the main widget and layout
         self.main_widget = QWidget()
@@ -35,16 +40,29 @@ class MainWindow(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        # Dropdown for region acronyms
-        self.region_label = QLabel("Select Regions (comma-separated):")
-        self.region_input = QComboBox()
-        self.region_input.setEditable(True)
-        self.region_input.setInsertPolicy(QComboBox.NoInsert)
+        # Label for region selection
+        self.region_label = QLabel("Select Regions:")
+
+        # Search bar for filtering regions
+        self.search_bar = QLineEdit()
+        self.search_bar.setPlaceholderText("Search regions...")
+        self.search_bar.textChanged.connect(self.filter_regions)
+
+        # TableWidget for region selection with checkboxes
+        self.region_table = QTableWidget()
+        self.region_table.setColumnCount(11)  # Adjust the number of columns as needed
+        self.region_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.region_table.horizontalHeader().hide()
+        self.region_table.verticalHeader().hide()
+        self.region_table.horizontalHeader().setStretchLastSection(True)
+        self.region_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         # Dropdown for projection measure
         self.proj_label = QLabel("Select Projection Measure:")
-        self.proj_combo = QComboBox()
-        self.proj_combo.addItems(['projection_volume', 'projection_density', 'projection_energy'])
+        self.proj_combo = QPushButton("Select Projection Measure")
+        self.proj_combo_menu = self.create_proj_combo_menu()
+        self.proj_combo.setMenu(self.proj_combo_menu)
+        self.selected_proj_measure = 'projection_volume'  # Default selection
 
         # Checkbox for including descendants
         self.descendants_checkbox = QCheckBox("Include Descendants")
@@ -56,6 +74,7 @@ class MainWindow(QMainWindow):
         self.arrow_size_slider.setMinimum(1)
         self.arrow_size_slider.setMaximum(20)
         self.arrow_size_slider.setValue(10)
+        self.arrow_size_slider.valueChanged.connect(self.update_arrow_size)
 
         # Button to run the analysis
         self.run_button = QPushButton("Run")
@@ -79,46 +98,113 @@ class MainWindow(QMainWindow):
 
         # Arrange layout
         self.layout.addWidget(self.region_label, 0, 0)
-        self.layout.addWidget(self.region_input, 0, 1)
-        self.layout.addWidget(self.proj_label, 1, 0)
-        self.layout.addWidget(self.proj_combo, 1, 1)
-        self.layout.addWidget(self.descendants_checkbox, 2, 0, 1, 2)
-        self.layout.addWidget(self.arrow_size_label, 3, 0)
-        self.layout.addWidget(self.arrow_size_slider, 3, 1)
-        self.layout.addWidget(self.run_button, 4, 0, 1, 2)
-        self.layout.addWidget(self.toolbar, 5, 0, 1, 2)
-        self.layout.addWidget(self.canvas, 6, 0, 1, 2)
-        self.layout.addWidget(self.save_button, 7, 0)
-        self.layout.addWidget(self.transparent_checkbox, 7, 1)
+        self.layout.addWidget(self.search_bar, 0, 1)
+        self.layout.addWidget(self.region_table, 1, 0, 1, 2)
+        self.layout.addWidget(self.proj_label, 2, 0)
+        self.layout.addWidget(self.proj_combo, 2, 1)
+        self.layout.addWidget(self.descendants_checkbox, 3, 0, 1, 2)
+        self.layout.addWidget(self.arrow_size_label, 4, 0)
+        self.layout.addWidget(self.arrow_size_slider, 4, 1)
+        self.layout.addWidget(self.run_button, 5, 0, 1, 2)
+        self.layout.addWidget(self.toolbar, 6, 0, 1, 2)
+        self.layout.addWidget(self.canvas, 7, 0, 1, 2)
+        self.layout.addWidget(self.save_button, 8, 0)
+        self.layout.addWidget(self.transparent_checkbox, 8, 1)
 
         # Load initial data
         self.load_region_acronyms()
+
+    def create_proj_combo_menu(self):
+        from PyQt5.QtWidgets import QMenu, QAction
+        menu = QMenu()
+        measures = ['projection_volume', 'projection_density', 'projection_energy']
+        for measure in measures:
+            action = QAction(measure, self)
+            action.triggered.connect(lambda checked, m=measure: self.set_proj_measure(m))
+            menu.addAction(action)
+        return menu
+
+    def set_proj_measure(self, measure):
+        self.selected_proj_measure = measure
+        self.proj_combo.setText(measure)
 
     def load_region_acronyms(self):
         # Load the structure tree and get all acronyms
         structures = structure_tree.nodes()
         all_acronyms = [struct['acronym'] for struct in structures]
-        self.region_input.addItems(sorted(all_acronyms))
+        all_acronyms = sorted(all_acronyms)
+        self.all_acronyms = all_acronyms  # Store for filtering
+
+        # Populate the region table
+        self.display_regions(all_acronyms)
+
+    def display_regions(self, acronyms):
+        # Clear existing items
+        self.region_table.setRowCount(0)
+
+        columns = self.region_table.columnCount()
+        rows = (len(acronyms) + columns - 1) // columns
+        self.region_table.setRowCount(rows)
+
+        # Add checkboxes to the table cells
+        index = 0
+        for row in range(rows):
+            for col in range(columns):
+                if index >= len(acronyms):
+                    break
+                acronym = acronyms[index]
+                item = QTableWidgetItem(acronym)
+                item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+                # Preserve existing check state if possible
+                if acronym in self.selected_acronyms:
+                    item.setCheckState(Qt.Checked)
+                else:
+                    item.setCheckState(Qt.Unchecked)
+                self.region_table.setItem(row, col, item)
+                index += 1
+
+        # Optionally, pre-select specific regions on initial load
+        if not hasattr(self, 'selected_acronyms'):
+            self.selected_acronyms = set(['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs'])
+            for acronym in self.selected_acronyms:
+                for row in range(self.region_table.rowCount()):
+                    for col in range(self.region_table.columnCount()):
+                        item = self.region_table.item(row, col)
+                        if item and item.text() == acronym:
+                            item.setCheckState(Qt.Checked)
+
+    def filter_regions(self, text):
+        text = text.lower()
+        filtered_acronyms = [acronym for acronym in self.all_acronyms if text in acronym.lower()]
+        self.display_regions(filtered_acronyms)
+
+    def get_selected_regions(self):
+        selected_acronyms = []
+        for row in range(self.region_table.rowCount()):
+            for col in range(self.region_table.columnCount()):
+                item = self.region_table.item(row, col)
+                if item and item.checkState() == Qt.Checked:
+                    selected_acronyms.append(item.text())
+        self.selected_acronyms = set(selected_acronyms)
+        return selected_acronyms
 
     def run_analysis(self):
         # Clear the current figure
         self.figure.clear()
 
         # Get selected regions and parameters
-        selected_regions_text = self.region_input.currentText()
-        selected_acronyms = [acronym.strip() for acronym in selected_regions_text.split(',') if acronym.strip()]
-        proj_measure = self.proj_combo.currentText()
+        selected_acronyms = self.get_selected_regions()
+        proj_measure = self.selected_proj_measure
         include_descendants = self.descendants_checkbox.isChecked()
         arrow_size = self.arrow_size_slider.value()
 
-        if not selected_acronyms:
-            print("No regions selected.")
+        if len(selected_acronyms) < 2:
+            print("Please select at least two regions.")
             return
 
         # Prepare region_acronyms dictionary
         region_acronyms = {acronym: acronym for acronym in selected_acronyms}
 
-        # Now, replicate your code with the selected parameters
         # Get the list of acronyms
         acronyms = list(region_acronyms.values())
 
@@ -140,7 +226,7 @@ class MainWindow(QMainWindow):
         regions = list(region_ids.keys())
 
         if len(regions) < 2:
-            print("Please select at least two regions.")
+            print("Please select at least two valid regions.")
             return
 
         # Initialize the directed graph
@@ -153,6 +239,8 @@ class MainWindow(QMainWindow):
         region_pairs = [(s, t) for s in regions for t in regions if s != t]
 
         # Compute projection densities and add edges
+        weights = []
+        edges = []
         for source, target in region_pairs:
             source_id = region_ids[source]
             target_id = region_ids[target]
@@ -160,6 +248,8 @@ class MainWindow(QMainWindow):
             unit = get_projection_data(source_id, target_id, proj_measure=proj_measure,
                                        include_descendants=include_descendants, print_regions=False)
             G.add_edge(source, target, weight=unit, direction=(source, target))
+            weights.append(unit)
+            edges.append((source, target))
 
         # Visualization
         ax = self.figure.add_subplot(111)
@@ -167,11 +257,8 @@ class MainWindow(QMainWindow):
         # Position the nodes
         pos = nx.circular_layout(G)
 
-        # Get edge weights and directions
-        edges = G.edges(data=True)
-        weights = [data['weight'] for _, _, data in edges]
-
-        if not weights or max(weights) == 0:
+        # Handle cases where weights are all zero
+        if not any(weights):
             print("No projection data available for the selected regions.")
             ax.set_title('No Data Available')
             self.canvas.draw()
@@ -183,42 +270,55 @@ class MainWindow(QMainWindow):
         # Create color map
         cmap = cm.viridis
 
-        # Create lists for edges
-        edge_list = []
-        edge_widths = []
-        edge_colors = []
-        for idx, (u, v, data) in enumerate(edges):
-            weight = data['weight']
-            log_weight = log_weights[idx]
+        # Normalize weights for color mapping
+        norm = plt.Normalize(min(log_weights), max(log_weights))
 
-            edge_width = log_weight * (arrow_size / 10)  # Scale by arrow size
-            edge_color = cmap(min(max(log_weight / max(log_weights), 0), 1))
+        # Store variables for later use
+        self.G = G
+        self.pos = pos
+        self.log_weights = log_weights
+        self.edges = edges
+        self.edge_colors = [cmap(norm(lw)) for lw in log_weights]
+        self.edge_widths_base = log_weights  # Base widths before scaling
 
-            edge_list.append((u, v))
-            edge_widths.append(edge_width)
-            edge_colors.append(edge_color)
+        # Draw the initial plot
+        self.update_arrow_size()
+
+    def update_arrow_size(self):
+        if not hasattr(self, 'G'):
+            return  # No graph to update
+
+        # Get new arrow size
+        arrow_size = self.arrow_size_slider.value()
+
+        # Clear the axes
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+
+        # Recompute edge widths based on new arrow size
+        edge_widths = [lw * (arrow_size / 10) for lw in self.edge_widths_base]
 
         # Draw nodes
-        nx.draw_networkx_nodes(G, pos, node_size=500, node_color='lightblue', ax=ax)
+        nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax)
 
         # Draw edges
         nx.draw_networkx_edges(
-            G, pos,
-            edgelist=edge_list,
+            self.G, self.pos,
+            edgelist=self.edges,
             arrowstyle='-|>',
             arrowsize=15,
             width=edge_widths,
-            edge_color=edge_colors,
-            connectionstyle='arc3, rad=-0.1',  # Straight lines
+            edge_color=self.edge_colors,
+            connectionstyle='arc3, rad=-.1',  # Straight lines
             ax=ax
         )
 
         # Draw labels
-        nx.draw_networkx_labels(G, pos, font_size=8, font_weight='bold', ax=ax)
+        nx.draw_networkx_labels(self.G, self.pos, font_size=8, font_weight='bold', ax=ax)
 
         # Add color bar
-        sm = cm.ScalarMappable(cmap=cmap)
-        sm.set_array(log_weights)
+        sm = cm.ScalarMappable(cmap=cm.viridis)
+        sm.set_array(self.log_weights)
         self.figure.colorbar(sm, label='Connection Strength (log scale)', ax=ax)
 
         # Set title and axis off
