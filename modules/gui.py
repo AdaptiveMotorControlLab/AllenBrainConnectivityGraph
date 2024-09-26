@@ -1,13 +1,15 @@
 # modules/gui.py
 
 import sys
+import traceback
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QHBoxLayout, QLabel, QPushButton, QFileDialog,
+    QHBoxLayout, QLabel, QPushButton, QFileDialog,QMessageBox,
     QCheckBox, QSlider, QGridLayout, QLineEdit, QTableWidget,
-    QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea
+    QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea,
+    QComboBox  # New import for the connection type selector
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 import os
 # Matplotlib imports for embedding in PyQt5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -20,13 +22,26 @@ import numpy as np
 
 from modules.data_processing import structure_tree, get_projection_data
 
+def global_exception_handler(exctype, value, tb):
+    """Global function to catch unhandled exceptions."""
+    error_message = ''.join(traceback.format_exception(exctype, value, tb))
+    print("An unhandled error occurred:")
+    print(error_message)
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Critical)
+    msg.setText("An unexpected error occurred.")
+    msg.setInformativeText(str(value))
+    msg.setWindowTitle("Error")
+    msg.setDetailedText(error_message)
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec_()
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Brain Connectivity Visualization")
-        self.setGeometry(50, 50, 1200, 1000) # The 4 dimensions correspond to x, y, width, height
+        self.setGeometry(50, 50, 1200, 1000)
 
         # Initialize selected_acronyms
         self.selected_acronyms = ['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs']
@@ -38,6 +53,12 @@ class MainWindow(QMainWindow):
 
         # Initialize UI components
         self.init_ui()
+
+        # Add a QTimer for handling the shutdown
+        self.shutdown_timer = QTimer()
+        self.shutdown_timer.setSingleShot(True)
+        self.shutdown_timer.timeout.connect(self.shutdown)
+
 
     def init_ui(self):
         # Label for region selection
@@ -82,7 +103,6 @@ class MainWindow(QMainWindow):
         self.proj_combo_menu = self.create_proj_combo_menu()
         self.proj_combo.setMenu(self.proj_combo_menu)
         self.selected_proj_measure = 'projection_energy'  # Default selection
-        self.setWindowTitle(f"Brain Connectivity Visualization \n {self.selected_proj_measure}")
 
         # Checkbox for including descendants
         self.descendants_checkbox = QCheckBox("Include Descendants")
@@ -95,6 +115,20 @@ class MainWindow(QMainWindow):
         self.arrow_size_slider.setMaximum(20)
         self.arrow_size_slider.setValue(10)
         self.arrow_size_slider.valueChanged.connect(self.update_arrow_size)
+
+        # New: Add a combo box for connection type selection
+        self.connection_type_label = QLabel("Connection Type:")
+        self.connection_type_combo = QComboBox()
+        self.connection_type_combo.addItems(["All Connections", "Afferent to Selected", "Efferent from Selected"])
+        
+        # New: Add a combo box for target/source region selection
+        self.target_source_label = QLabel("Target/Source Region:")
+        self.target_source_combo = QComboBox()
+        self.target_source_combo.addItems(self.selected_acronyms)
+        self.target_source_combo.setEnabled(False)  # Initially disabled
+
+        # New: Connect the connection type combo box to an update function
+        self.connection_type_combo.currentIndexChanged.connect(self.update_target_source_combo)
 
         # Button to run the analysis
         self.run_button = QPushButton("Run")
@@ -122,20 +156,35 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.region_table_scroll, 1, 0, 1, 2)
         self.layout.addWidget(self.current_selection_label, 2, 0)
         self.layout.addWidget(self.selected_regions_display, 2, 1)
-        self.layout.addWidget(self.clear_selections_button, 3, 0, 1, 1) # The 4 numbers of addWidget function correspond to row, column, rowSpan, columnSpan
+        self.layout.addWidget(self.clear_selections_button, 3, 0, 1, 1)
         self.layout.addWidget(self.proj_label, 4, 0)
         self.layout.addWidget(self.proj_combo, 4, 1)
         self.layout.addWidget(self.descendants_checkbox, 5, 0, 1, 2)
         self.layout.addWidget(self.arrow_size_label, 6, 0)
         self.layout.addWidget(self.arrow_size_slider, 6, 1)
-        self.layout.addWidget(self.run_button, 7, 0, 1, 2)
-        self.layout.addWidget(self.toolbar, 8, 0, 1, 2)
-        self.layout.addWidget(self.canvas, 9, 0, 1, 2)
-        self.layout.addWidget(self.save_button, 10, 0)
-        self.layout.addWidget(self.transparent_checkbox, 10, 1)
+        # New: Add new widgets to the layout
+        self.layout.addWidget(self.connection_type_label, 7, 0)
+        self.layout.addWidget(self.connection_type_combo, 7, 1)
+        self.layout.addWidget(self.target_source_label, 8, 0)
+        self.layout.addWidget(self.target_source_combo, 8, 1)
+        self.layout.addWidget(self.run_button, 9, 0, 1, 2)
+        self.layout.addWidget(self.toolbar, 10, 0, 1, 2)
+        self.layout.addWidget(self.canvas, 11, 0, 1, 2)
+        self.layout.addWidget(self.save_button, 12, 0)
+        self.layout.addWidget(self.transparent_checkbox, 12, 1)
 
         # Load initial data
         self.load_region_acronyms()
+
+    # New: Method to update target/source combo box based on connection type
+    def update_target_source_combo(self):
+        connection_type = self.connection_type_combo.currentText()
+        if connection_type in ["Afferent to Selected", "Efferent from Selected"]:
+            self.target_source_combo.setEnabled(True)
+            self.target_source_combo.clear()
+            self.target_source_combo.addItems(self.selected_acronyms)
+        else:
+            self.target_source_combo.setEnabled(False)
 
     def clear_selections(self):
         # Clear the selected_acronyms list
@@ -240,6 +289,8 @@ class MainWindow(QMainWindow):
         proj_measure = self.selected_proj_measure
         include_descendants = self.descendants_checkbox.isChecked()
         arrow_size = self.arrow_size_slider.value()
+        connection_type = self.connection_type_combo.currentText()
+        target_source = self.target_source_combo.currentText()
 
         if len(selected_acronyms) < 2:
             print("Please select at least two regions.")
@@ -278,8 +329,13 @@ class MainWindow(QMainWindow):
         # Add nodes
         G.add_nodes_from(regions)
 
-        # Generate all possible pairs of regions (excluding self-loops)
-        region_pairs = [(s, t) for s in regions for t in regions if s != t]
+        # Generate pairs of regions based on the selected connection type
+        if connection_type == "All Connections":
+            region_pairs = [(s, t) for s in regions for t in regions if s != t]
+        elif connection_type == "Afferent to Selected":
+            region_pairs = [(s, target_source) for s in regions if s != target_source]
+        elif connection_type == "Efferent from Selected":
+            region_pairs = [(target_source, t) for t in regions if t != target_source]
 
         # Compute projection densities and add edges
         weights = []
@@ -299,6 +355,7 @@ class MainWindow(QMainWindow):
 
         # Position the nodes
         pos = nx.circular_layout(G)
+
 
         # Handle cases where weights are all zero
         if not any(weights):
@@ -394,3 +451,14 @@ class MainWindow(QMainWindow):
         if file_path:
             transparent = self.transparent_checkbox.isChecked()
             self.figure.savefig(file_path, transparent=transparent)
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        self.shutdown_timer.start(200)  # Start shutdown timer
+        event.accept()
+
+    def shutdown(self):
+        """Perform cleanup operations"""
+        print("Shutting down...")
+        # Add any cleanup operations here (e.g., closing file handles, saving state)
+        QApplication.quit()
