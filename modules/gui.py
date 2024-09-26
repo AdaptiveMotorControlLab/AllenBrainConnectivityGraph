@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QFileDialog,
     QCheckBox, QSlider, QGridLayout, QLineEdit, QTableWidget,
-    QTableWidgetItem, QAbstractItemView
+    QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea
 )
 from PyQt5.QtCore import Qt
 
@@ -56,6 +56,21 @@ class MainWindow(QMainWindow):
         self.region_table.verticalHeader().hide()
         self.region_table.horizontalHeader().setStretchLastSection(True)
         self.region_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.region_table.itemChanged.connect(self.update_selected_regions_display)
+
+        # Scroll area for the region table
+        self.region_table_scroll = QScrollArea()
+        self.region_table_scroll.setWidgetResizable(True)
+        self.region_table_scroll.setWidget(self.region_table)
+        self.region_table_scroll.setFixedHeight(100)  # Adjust height as needed
+
+        # Label for currently selected regions
+        self.current_selection_label = QLabel("Currently Selected Regions:")
+
+        # Text area to display selected regions
+        self.selected_regions_display = QTextEdit()
+        self.selected_regions_display.setReadOnly(True)
+        self.selected_regions_display.setFixedHeight(80)  # Adjust height as needed
 
         # Dropdown for projection measure
         self.proj_label = QLabel("Select Projection Measure:")
@@ -99,17 +114,19 @@ class MainWindow(QMainWindow):
         # Arrange layout
         self.layout.addWidget(self.region_label, 0, 0)
         self.layout.addWidget(self.search_bar, 0, 1)
-        self.layout.addWidget(self.region_table, 1, 0, 1, 2)
-        self.layout.addWidget(self.proj_label, 2, 0)
-        self.layout.addWidget(self.proj_combo, 2, 1)
-        self.layout.addWidget(self.descendants_checkbox, 3, 0, 1, 2)
-        self.layout.addWidget(self.arrow_size_label, 4, 0)
-        self.layout.addWidget(self.arrow_size_slider, 4, 1)
-        self.layout.addWidget(self.run_button, 5, 0, 1, 2)
-        self.layout.addWidget(self.toolbar, 6, 0, 1, 2)
-        self.layout.addWidget(self.canvas, 7, 0, 1, 2)
-        self.layout.addWidget(self.save_button, 8, 0)
-        self.layout.addWidget(self.transparent_checkbox, 8, 1)
+        self.layout.addWidget(self.region_table_scroll, 1, 0, 1, 2)
+        self.layout.addWidget(self.current_selection_label, 2, 0)
+        self.layout.addWidget(self.selected_regions_display, 2, 1)
+        self.layout.addWidget(self.proj_label, 3, 0)
+        self.layout.addWidget(self.proj_combo, 3, 1)
+        self.layout.addWidget(self.descendants_checkbox, 4, 0, 1, 2)
+        self.layout.addWidget(self.arrow_size_label, 5, 0)
+        self.layout.addWidget(self.arrow_size_slider, 5, 1)
+        self.layout.addWidget(self.run_button, 6, 0, 1, 2)
+        self.layout.addWidget(self.toolbar, 7, 0, 1, 2)
+        self.layout.addWidget(self.canvas, 8, 0, 1, 2)
+        self.layout.addWidget(self.save_button, 9, 0)
+        self.layout.addWidget(self.transparent_checkbox, 9, 1)
 
         # Load initial data
         self.load_region_acronyms()
@@ -138,7 +155,13 @@ class MainWindow(QMainWindow):
         # Populate the region table
         self.display_regions(all_acronyms)
 
+        # Update the selected regions display
+        self.update_selected_regions_display()
+
     def display_regions(self, acronyms):
+        # Disconnect the itemChanged signal to prevent recursion
+        self.region_table.blockSignals(True)
+
         # Clear existing items
         self.region_table.setRowCount(0)
 
@@ -155,7 +178,7 @@ class MainWindow(QMainWindow):
                 acronym = acronyms[index]
                 item = QTableWidgetItem(acronym)
                 item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-                # Preserve existing check state if possible
+                # Set check state based on self.selected_acronyms
                 if acronym in self.selected_acronyms:
                     item.setCheckState(Qt.Checked)
                 else:
@@ -163,15 +186,8 @@ class MainWindow(QMainWindow):
                 self.region_table.setItem(row, col, item)
                 index += 1
 
-        # Optionally, pre-select specific regions on initial load
-        if not hasattr(self, 'selected_acronyms'):
-            self.selected_acronyms = set(['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs'])
-            for acronym in self.selected_acronyms:
-                for row in range(self.region_table.rowCount()):
-                    for col in range(self.region_table.columnCount()):
-                        item = self.region_table.item(row, col)
-                        if item and item.text() == acronym:
-                            item.setCheckState(Qt.Checked)
+        # Reconnect the itemChanged signal
+        self.region_table.blockSignals(False)
 
     def filter_regions(self, text):
         text = text.lower()
@@ -179,14 +195,19 @@ class MainWindow(QMainWindow):
         self.display_regions(filtered_acronyms)
 
     def get_selected_regions(self):
-        selected_acronyms = []
-        for row in range(self.region_table.rowCount()):
-            for col in range(self.region_table.columnCount()):
-                item = self.region_table.item(row, col)
-                if item and item.checkState() == Qt.Checked:
-                    selected_acronyms.append(item.text())
-        self.selected_acronyms = set(selected_acronyms)
-        return selected_acronyms
+        # Return the selected regions
+        return list(self.selected_acronyms)
+
+    def update_selected_regions_display(self, item=None):
+        if item is not None and item.flags() & Qt.ItemIsUserCheckable:
+            acronym = item.text()
+            if item.checkState() == Qt.Checked:
+                self.selected_acronyms.add(acronym)
+            else:
+                self.selected_acronyms.discard(acronym)
+        # Update the display
+        selected_regions_text = ', '.join(sorted(self.selected_acronyms))
+        self.selected_regions_display.setText(selected_regions_text)
 
     def run_analysis(self):
         # Clear the current figure
