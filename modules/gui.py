@@ -45,11 +45,15 @@ class MainWindow(QMainWindow):
 
         # Initialize selected_acronyms
         self.selected_acronyms = ['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs']
+        # Initialize colormap range values
+        self.vmin = 0
+        self.vmax = 5
 
         # Initialize the main widget and layout
         self.main_widget = QWidget()
         self.setCentralWidget(self.main_widget)
         self.layout = QGridLayout(self.main_widget)
+        self.cmap = cm.get_cmap('viridis')  # Set default colormap
 
         # Initialize UI components
         self.init_ui()
@@ -83,7 +87,7 @@ class MainWindow(QMainWindow):
         self.region_table_scroll = QScrollArea()
         self.region_table_scroll.setWidgetResizable(True)
         self.region_table_scroll.setWidget(self.region_table)
-        self.region_table_scroll.setFixedHeight(100)  # Adjust height as needed
+        self.region_table_scroll.setFixedHeight(80)  # Adjust height as needed
 
         # Label for currently selected regions
         self.current_selection_label = QLabel("Currently Selected Regions:")
@@ -91,7 +95,7 @@ class MainWindow(QMainWindow):
         # Text area to display selected regions
         self.selected_regions_display = QTextEdit()
         self.selected_regions_display.setReadOnly(True)
-        self.selected_regions_display.setFixedHeight(80)  # Adjust height as needed
+        self.selected_regions_display.setFixedHeight(20)  # Adjust height as needed
         
         # Button to clear selections
         self.clear_selections_button = QPushButton("Clear Selections")
@@ -116,6 +120,14 @@ class MainWindow(QMainWindow):
         self.arrow_size_slider.setValue(10)
         self.arrow_size_slider.valueChanged.connect(self.update_arrow_size)
 
+        # New: Add a slider for arrow width scaling
+        self.arrow_width_label = QLabel("Arrow Width Scaling:")
+        self.arrow_width_slider = QSlider(Qt.Horizontal)
+        self.arrow_width_slider.setMinimum(1)
+        self.arrow_width_slider.setMaximum(20)
+        self.arrow_width_slider.setValue(10)
+        self.arrow_width_slider.valueChanged.connect(self.update_arrow_size)
+
         # New: Add a combo box for connection type selection
         self.connection_type_label = QLabel("Connection Type:")
         self.connection_type_combo = QComboBox()
@@ -129,7 +141,26 @@ class MainWindow(QMainWindow):
 
         # New: Connect the connection type combo box to an update function
         self.connection_type_combo.currentIndexChanged.connect(self.update_target_source_combo)
+        
+        # Add new UI elements for colormap range
+        self.vmin_label = QLabel("Colormap Min:")
+        self.vmin_input = QLineEdit()
+        self.vmin_input.setPlaceholderText("Enter min value")
+        self.vmin_input.textChanged.connect(self.update_colormap_range)
 
+        self.vmax_label = QLabel("Colormap Max:")
+        self.vmax_input = QLineEdit()
+        self.vmax_input.setPlaceholderText("Enter max value")
+        self.vmax_input.textChanged.connect(self.update_colormap_range)
+
+        # Add a colormap selector
+        self.colormap_label = QLabel("Select Colormap:")
+        self.colormap_combo = QComboBox()
+        colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'Greys', 'Blues', 'Reds', 'Purples', 'Oranges']
+        self.colormap_combo.addItems(colormaps)
+        self.colormap_combo.setCurrentText('viridis')
+        self.colormap_combo.currentIndexChanged.connect(self.update_colormap)
+        
         # Button to run the analysis
         self.run_button = QPushButton("Run")
         self.run_button.clicked.connect(self.run_analysis)
@@ -163,16 +194,24 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.arrow_size_label, 6, 0)
         self.layout.addWidget(self.arrow_size_slider, 6, 1)
         # New: Add new widgets to the layout
-        self.layout.addWidget(self.connection_type_label, 7, 0)
-        self.layout.addWidget(self.connection_type_combo, 7, 1)
-        self.layout.addWidget(self.target_source_label, 8, 0)
-        self.layout.addWidget(self.target_source_combo, 8, 1)
-        self.layout.addWidget(self.run_button, 9, 0, 1, 2)
-        self.layout.addWidget(self.toolbar, 10, 0, 1, 2)
-        self.layout.addWidget(self.canvas, 11, 0, 1, 2)
-        self.layout.addWidget(self.save_button, 12, 0)
-        self.layout.addWidget(self.transparent_checkbox, 12, 1)
-
+        self.layout.addWidget(self.arrow_width_label, 7, 0)
+        self.layout.addWidget(self.arrow_width_slider, 7, 1)
+        self.layout.addWidget(self.connection_type_label, 8, 0)
+        self.layout.addWidget(self.connection_type_combo, 8, 1)
+        self.layout.addWidget(self.target_source_label, 9, 0)
+        self.layout.addWidget(self.target_source_combo, 9, 1)
+        self.layout.addWidget(self.run_button, 10, 0, 1, 2)
+        self.layout.addWidget(self.toolbar, 11, 0, 1, 2)
+        self.layout.addWidget(self.canvas, 12, 0, 1, 2)
+        self.layout.addWidget(self.save_button, 13, 0)
+        self.layout.addWidget(self.transparent_checkbox, 13, 1)
+        # Add new UI elements to the layout
+        self.layout.addWidget(self.vmin_label, 14, 0)
+        self.layout.addWidget(self.vmin_input, 14, 1)
+        self.layout.addWidget(self.vmax_label, 15, 0)
+        self.layout.addWidget(self.vmax_input, 15, 1)
+        self.layout.addWidget(self.colormap_label, 16, 0)
+        self.layout.addWidget(self.colormap_combo, 16, 1)
         # Load initial data
         self.load_region_acronyms()
 
@@ -367,21 +406,57 @@ class MainWindow(QMainWindow):
         # Apply logarithmic scaling (optional)
         log_weights = [np.log1p(w) for w in weights]
 
-        # Create color map
-        cmap = cm.viridis
-
-        # Normalize weights for color mapping
-        norm = plt.Normalize(min(log_weights), max(log_weights))
-
         # Store variables for later use
         self.G = G
         self.pos = pos
         self.log_weights = log_weights
         self.edges = edges
-        self.edge_colors = [cmap(norm(lw)) for lw in log_weights]
-        self.edge_widths_base = log_weights  # Base widths before scaling
+        self.log_weights_min = min(log_weights)
+        self.log_weights_max = max(log_weights)
+
+        # Set initial vmin and vmax
+        self.vmin = 0#self.log_weights_min
+        self.vmax = self.log_weights_max
+
+        # Update vmin and vmax inputs
+        self.vmin_input.setText(str(self.vmin))
+        self.vmax_input.setText(str(self.vmax))
+
+        # Set default colormap
+        self.cmap = cm.get_cmap('viridis')
 
         # Draw the initial plot
+        self.update_arrow_size()
+
+    def update_colormap_range(self):
+        vmin_text = self.vmin_input.text()
+        vmax_text = self.vmax_input.text()
+
+        try:
+            if vmin_text == '':
+                vmin = self.log_weights_min
+            else:
+                vmin = float(vmin_text)
+
+            if vmax_text == '':
+                vmax = self.log_weights_max
+            else:
+                vmax = float(vmax_text)
+
+            if vmin >= vmax:
+                raise ValueError("vmin must be less than vmax.")
+
+            self.vmin = 0#vmin
+            self.vmax = vmax
+
+            self.update_arrow_size()
+
+        except ValueError as e:
+            print(f"Invalid vmin/vmax input: {e}")
+
+    def update_colormap(self):
+        selected_cmap_name = self.colormap_combo.currentText()
+        self.cmap = cm.get_cmap(selected_cmap_name)
         self.update_arrow_size()
 
     def update_arrow_size(self):
@@ -390,26 +465,31 @@ class MainWindow(QMainWindow):
 
         # Get new arrow size
         arrow_size = self.arrow_size_slider.value()
+        arrow_width_scaling = self.arrow_width_slider.value() / 10  # scale from 0.1 to 2.0
 
         # Clear the axes
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
         # Compute the minimum and maximum log weights
-        min_lw = min(self.edge_widths_base)
-        max_lw = max(self.edge_widths_base)
+        min_lw = min(self.log_weights)
+        max_lw = max(self.log_weights)
 
         # Avoid division by zero
-        if max_lw - min_lw == 0:
-            norm_edge_widths = [1 for lw in self.edge_widths_base]
+        if self.vmax - self.vmin == 0:
+            norm_edge_widths = [1 for lw in self.log_weights]
         else:
             # Normalize edge widths to a range [1, 5]
             norm_edge_widths = [
-                1 + 4 * (lw - min_lw) / (max_lw - min_lw) for lw in self.edge_widths_base
+                1 + 4 * (lw - self.vmin) / (self.vmax - self.vmin) for lw in self.log_weights
             ]
 
-        # Recompute edge widths based on new arrow size
-        edge_widths = [w * (arrow_size / 10) for w in norm_edge_widths]
+        # Recompute edge widths based on new arrow size and scaling
+        edge_widths = [w * arrow_width_scaling for w in norm_edge_widths]
+
+        # Normalize weights for color mapping
+        norm = plt.Normalize(self.vmin, self.vmax)
+        self.edge_colors = [self.cmap(norm(lw)) for lw in self.log_weights]
 
         # Draw nodes
         nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax, alpha=0.6)
@@ -430,7 +510,7 @@ class MainWindow(QMainWindow):
         nx.draw_networkx_labels(self.G, self.pos, font_size=8, font_weight='bold', ax=ax)
 
         # Add color bar
-        sm = cm.ScalarMappable(cmap=cm.viridis)
+        sm = cm.ScalarMappable(cmap=self.cmap, norm=norm)
         sm.set_array(self.log_weights)
         self.figure.colorbar(sm, label='Connection Strength (log scale)', ax=ax)
 
