@@ -536,13 +536,57 @@ class MainWindow(QMainWindow):
     def save_figure(self):
         options = QFileDialog.Options()
         file_types = "PNG Files (*.png);;SVG Files (*.svg)"
+        # Generate default filename with metadata
+        default_filename = self.generate_default_filename()
         # Default path should be in data folder of this project
-        default_path = os.path.join(os.getcwd(), "data")
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Figure", default_path, file_types, options=options)
+        default_path = os.path.join(os.getcwd(), "data", default_filename)
+        file_path, selected_filter = QFileDialog.getSaveFileName(self, "Save Figure", default_path, file_types, options=options)
 
         if file_path:
+            # Adjust extension based on selected filter
+            if selected_filter == "PNG Files (*.png)":
+                if not file_path.endswith('.png'):
+                    file_path += '.png'
+            elif selected_filter == "SVG Files (*.svg)":
+                if not file_path.endswith('.svg'):
+                    file_path += '.svg'
             transparent = self.transparent_checkbox.isChecked()
             self.figure.savefig(file_path, transparent=transparent)
+
+    def generate_default_filename(self):
+        # Get selected regions
+        selected_regions = self.get_selected_regions()
+        regions_str = "_".join(selected_regions)
+        
+        # Get connection type
+        connection_type = self.connection_type_combo.currentText()
+        if connection_type == "All Connections":
+            connection_str = "AllConnections"
+        elif connection_type == "Afferent to Selected":
+            connection_str = f"AfferentTo_{self.target_source_combo.currentText()}_From"
+        elif connection_type == "Efferent from Selected":
+            connection_str = f"EfferentFrom_{self.target_source_combo.currentText()}_To"
+        else:
+            connection_str = "UnknownConnectionType"
+        
+        # Get projection measure
+        proj_measure_str = self.selected_proj_measure
+        
+        # Assemble filename
+        filename = f"{proj_measure_str}_{connection_str}_{regions_str}"
+        
+        # Sanitize filename: remove or replace invalid characters
+        filename = self.sanitize_filename(filename)
+        
+        # Note: Do not add extension here since it will be handled based on selected file type
+        return filename
+
+    def sanitize_filename(self, filename):
+        # Remove invalid characters for filenames
+        invalid_chars = '<>:"/\\|?* '
+        for char in invalid_chars:
+            filename = filename.replace(char, '_')
+        return filename
 
     def closeEvent(self, event):
         """Handle window close event"""
