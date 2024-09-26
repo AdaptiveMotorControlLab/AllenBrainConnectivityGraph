@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea
 )
 from PyQt5.QtCore import Qt
-
+import os
 # Matplotlib imports for embedding in PyQt5
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
 
         # Initialize selected_acronyms
-        self.selected_acronyms = set(['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs'])
+        self.selected_acronyms = ['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs']
 
         # Initialize the main widget and layout
         self.main_widget = QWidget()
@@ -196,17 +196,19 @@ class MainWindow(QMainWindow):
 
     def get_selected_regions(self):
         # Return the selected regions
-        return list(self.selected_acronyms)
+        return self.selected_acronyms
 
     def update_selected_regions_display(self, item=None):
         if item is not None and item.flags() & Qt.ItemIsUserCheckable:
             acronym = item.text()
             if item.checkState() == Qt.Checked:
-                self.selected_acronyms.add(acronym)
+                if acronym not in self.selected_acronyms:
+                    self.selected_acronyms.append(acronym)
             else:
-                self.selected_acronyms.discard(acronym)
+                if acronym in self.selected_acronyms:
+                    self.selected_acronyms.remove(acronym)
         # Update the display
-        selected_regions_text = ', '.join(sorted(self.selected_acronyms))
+        selected_regions_text = ', '.join(self.selected_acronyms)
         self.selected_regions_display.setText(selected_regions_text)
 
     def run_analysis(self):
@@ -352,7 +354,9 @@ class MainWindow(QMainWindow):
     def save_figure(self):
         options = QFileDialog.Options()
         file_types = "PNG Files (*.png);;SVG Files (*.svg)"
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Figure", "", file_types, options=options)
+        # Default path should be in data folder of this project
+        default_path = os.path.join(os.getcwd(), "data")
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Figure", default_path, file_types, options=options)
 
         if file_path:
             transparent = self.transparent_checkbox.isChecked()
