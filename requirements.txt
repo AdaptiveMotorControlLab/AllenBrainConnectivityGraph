@@ -1,0 +1,6 @@
+PyQt5
+allensdk
+matplotlib
+networkx
+tqdm
+numpy
