@@ -338,8 +338,21 @@ class MainWindow(QMainWindow):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
 
+        # Compute the minimum and maximum log weights
+        min_lw = min(self.edge_widths_base)
+        max_lw = max(self.edge_widths_base)
+
+        # Avoid division by zero
+        if max_lw - min_lw == 0:
+            norm_edge_widths = [1 for lw in self.edge_widths_base]
+        else:
+            # Normalize edge widths to a range [1, 5]
+            norm_edge_widths = [
+                1 + 4 * (lw - min_lw) / (max_lw - min_lw) for lw in self.edge_widths_base
+            ]
+
         # Recompute edge widths based on new arrow size
-        edge_widths = [lw * (arrow_size / 10) for lw in self.edge_widths_base]
+        edge_widths = [w * (arrow_size / 10) for w in norm_edge_widths]
 
         # Draw nodes
         nx.draw_networkx_nodes(self.G, self.pos, node_size=500, node_color='lightblue', ax=ax)
