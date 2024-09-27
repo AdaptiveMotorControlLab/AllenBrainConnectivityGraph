@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
         # Initialize more complex or time-consuming components here
         # This method will be called after the main window is shown
         pass
-    
+
     def init_ui(self):
         # Label for region selection
         self.region_label = QLabel("Select Regions:")
@@ -234,18 +234,6 @@ class MainWindow(QMainWindow):
 
         # Load initial data
         self.load_region_acronyms()
-
-    # Heatmap window
-    def open_heatmap_window(self):
-        # Lazy import of heatmap-related modules
-        from .heatmap import HeatmapWindow
-        
-        if not hasattr(self, 'G') or not hasattr(self, 'log_weights'):
-            print("Please run the analysis first.")
-            return
-
-        heatmap_window = HeatmapWindow(self)
-        heatmap_window.show()
 
     # Method to update target/source combo box based on connection type
     def update_target_source_combo(self):
@@ -489,7 +477,18 @@ class MainWindow(QMainWindow):
     def update_colormap(self):
         selected_cmap_name = self.colormap_combo.currentText()
         self.cmap = cm.get_cmap(selected_cmap_name)
-        self.update_arrow_size()
+        self.update_arrow_size()  # This will update the colors
+
+    def open_heatmap_window(self):
+        # Lazy import of heatmap-related modules
+        from .heatmap import HeatmapWindow
+        
+        if not hasattr(self, 'G') or not hasattr(self, 'log_weights'):
+            print("Please run the analysis first.")
+            return
+
+        heatmap_window = HeatmapWindow(self)
+        heatmap_window.show()
 
     def update_arrow_size(self):
         # Check if the necessary attributes are available

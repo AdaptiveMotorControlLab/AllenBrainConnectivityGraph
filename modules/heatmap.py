@@ -7,7 +7,7 @@ import os
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QCheckBox, QComboBox, QLabel, QFileDialog
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QCheckBox, QFileDialog
 
 class HeatmapWindow(QDialog):
     def __init__(self, parent=None):
@@ -37,16 +37,6 @@ class HeatmapWindow(QDialog):
         self.transparent_checkbox.setChecked(False)
         self.layout.addWidget(self.transparent_checkbox)
 
-        # Colormap selector
-        self.colormap_label = QLabel("Select Colormap:")
-        self.layout.addWidget(self.colormap_label)
-        self.colormap_combo = QComboBox()
-        colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'Greys', 'Blues', 'Reds', 'Purples', 'Oranges']
-        self.colormap_combo.addItems(colormaps)
-        self.colormap_combo.setCurrentText('viridis')
-        self.colormap_combo.currentIndexChanged.connect(self.update_heatmap)
-        self.layout.addWidget(self.colormap_combo)
-
         self.create_heatmap()
 
     def create_heatmap(self):
@@ -54,6 +44,8 @@ class HeatmapWindow(QDialog):
         G = self.parent.G
         log_weights = self.parent.log_weights
         edges = self.parent.edges
+        vmin = self.parent.vmin
+        vmax = self.parent.vmax
 
         # Create adjacency matrix
         nodes = list(G.nodes())
@@ -67,14 +59,13 @@ class HeatmapWindow(QDialog):
         # Create heatmap
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        sns.heatmap(adj_matrix, ax=ax, cmap=self.colormap_combo.currentText(),
-                    xticklabels=nodes, yticklabels=nodes, square=True, cbar_kws={'label': 'Connection Strength (log scale)'})
+        sns.heatmap(adj_matrix, ax=ax, cmap=self.parent.cmap,
+                    xticklabels=nodes, yticklabels=nodes, square=True,
+                    cbar_kws={'label': 'Connection Strength (log scale)'},
+                    vmin=vmin, vmax=vmax)
         ax.set_title(f'Connection Strength Heatmap\n{self.parent.selected_proj_measure}')
         plt.tight_layout()
         self.canvas.draw()
-
-    def update_heatmap(self):
-        self.create_heatmap()
 
     def save_figure(self):
         options = QFileDialog.Options()
@@ -90,4 +81,3 @@ class HeatmapWindow(QDialog):
                 file_path += '.svg'
             transparent = self.transparent_checkbox.isChecked()
             self.figure.savefig(file_path, transparent=transparent, bbox_inches='tight')
-
