@@ -14,6 +14,7 @@ Allows you to generate connectivity maps of different brain regions of interest.
 - Different colormap can be selected, with both their min and max, in case of different plotting we want the same scale.
 - Arrow size is also scaled by connection strength and can be adjusted live.
 - Saves metadata in filename
+- *NEW*: Heatmap of connectivity strength between regions, colormap and saving options available.
 
 Data is stored in the `connectivity` folder, locally.
 This repository contains the code to download the Allen Brain Atlas Connectivity Data. The data is downloaded from the Allen Brain Atlas API. The data is stored on your machine in the folder path specified in `data_processing.py` \\
