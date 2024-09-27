@@ -7,18 +7,20 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QFileDialog,QMessageBox,
     QCheckBox, QSlider, QGridLayout, QLineEdit, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QTextEdit, QScrollArea,
-    QComboBox
+    QComboBox, QDialog
 )
 from PyQt5.QtCore import Qt, QTimer
 import os
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import seaborn as sns
 
 from modules.data_processing import structure_tree, get_projection_data
 
@@ -35,6 +37,89 @@ def global_exception_handler(exctype, value, tb):
     msg.setDetailedText(error_message)
     msg.setStandardButtons(QMessageBox.Ok)
     msg.exec_()
+
+class HeatmapWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.setWindowTitle("Connection Strength Heatmap")
+        self.setGeometry(100, 100, 800, 600)
+
+        self.layout = QVBoxLayout(self)
+
+        # Matplotlib Figure and Canvas
+        self.figure = Figure(figsize=(8, 6))
+        self.canvas = FigureCanvas(self.figure)
+        self.layout.addWidget(self.canvas)
+
+        # Toolbar for interactive features
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.layout.addWidget(self.toolbar)
+
+        # Button to save the figure
+        self.save_button = QPushButton("Save Figure")
+        self.save_button.clicked.connect(self.save_figure)
+        self.layout.addWidget(self.save_button)
+
+        # Checkbox for transparency
+        self.transparent_checkbox = QCheckBox("Transparent Background")
+        self.transparent_checkbox.setChecked(False)
+        self.layout.addWidget(self.transparent_checkbox)
+
+        # Colormap selector
+        self.colormap_label = QLabel("Select Colormap:")
+        self.layout.addWidget(self.colormap_label)
+        self.colormap_combo = QComboBox()
+        colormaps = ['viridis', 'plasma', 'inferno', 'magma', 'cividis', 'Greys', 'Blues', 'Reds', 'Purples', 'Oranges']
+        self.colormap_combo.addItems(colormaps)
+        self.colormap_combo.setCurrentText('viridis')
+        self.colormap_combo.currentIndexChanged.connect(self.update_heatmap)
+        self.layout.addWidget(self.colormap_combo)
+
+        self.create_heatmap()
+
+    def create_heatmap(self):
+        # Get data from parent
+        G = self.parent.G
+        log_weights = self.parent.log_weights
+        edges = self.parent.edges
+
+        # Create adjacency matrix
+        nodes = list(G.nodes())
+        n = len(nodes)
+        adj_matrix = np.zeros((n, n))
+
+        for (u, v), w in zip(edges, log_weights):
+            i, j = nodes.index(u), nodes.index(v)
+            adj_matrix[i, j] = w
+
+        # Create heatmap
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        sns.heatmap(adj_matrix, ax=ax, cmap=self.colormap_combo.currentText(),
+                    xticklabels=nodes, yticklabels=nodes, square=True, cbar_kws={'label': 'Connection Strength (log scale)'})
+        ax.set_title(f'Connection Strength Heatmap\n{self.parent.selected_proj_measure}')
+        plt.tight_layout()
+        self.canvas.draw()
+
+    def update_heatmap(self):
+        self.create_heatmap()
+
+    def save_figure(self):
+        options = QFileDialog.Options()
+        file_types = "PNG Files (*.png);;SVG Files (*.svg)"
+        default_filename = self.parent.generate_default_filename() + "_heatmap"
+        default_path = os.path.join(os.getcwd(), "data", default_filename)
+        file_path, selected_filter = QFileDialog.getSaveFileName(self, "Save Heatmap", default_path, file_types, options=options)
+
+        if file_path:
+            if selected_filter == "PNG Files (*.png)" and not file_path.endswith('.png'):
+                file_path += '.png'
+            elif selected_filter == "SVG Files (*.svg)" and not file_path.endswith('.svg'):
+                file_path += '.svg'
+            transparent = self.transparent_checkbox.isChecked()
+            self.figure.savefig(file_path, transparent=transparent, bbox_inches='tight')
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -181,6 +266,10 @@ class MainWindow(QMainWindow):
         self.transparent_checkbox = QCheckBox("Transparent Background")
         self.transparent_checkbox.setChecked(False)
 
+        # Add button for opening heatmap window
+        self.heatmap_button = QPushButton("Open Heatmap")
+        self.heatmap_button.clicked.connect(self.open_heatmap_window)
+
         # Arrange layout
         self.layout.addWidget(self.region_label, 0, 0)
         self.layout.addWidget(self.search_bar, 0, 1)
@@ -212,8 +301,20 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.vmax_input, 15, 1)
         self.layout.addWidget(self.colormap_label, 16, 0)
         self.layout.addWidget(self.colormap_combo, 16, 1)
+
+        self.layout.addWidget(self.heatmap_button, 17, 0, 1, 2)
+
         # Load initial data
         self.load_region_acronyms()
+
+    # Heatmap window
+    def open_heatmap_window(self):
+        if not hasattr(self, 'G') or not hasattr(self, 'log_weights'):
+            print("Please run the analysis first.")
+            return
+
+        heatmap_window = HeatmapWindow(self)
+        heatmap_window.show()
 
     # Method to update target/source combo box based on connection type
     def update_target_source_combo(self):

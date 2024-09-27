@@ -39,6 +39,15 @@ python main.py
 - The first time you run any new brain region, it will take some time to download the data from the allen brain atals.
 
 ## App overview
+
+### Main Window
+
 <p align="center">
   <img src="data/AllenBrainConnectivityApp.gif" alt="GIF Animation">
+</p>
+
+### Heatmap window (*NEW*)
+
+<p align="center">
+  <img src="data/HeatmapConnectivity.gif" alt="GIF Animation">
 </p>
