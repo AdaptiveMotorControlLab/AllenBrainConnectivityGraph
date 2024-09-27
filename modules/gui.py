@@ -435,7 +435,7 @@ class MainWindow(QMainWindow):
         self.log_weights_max = max(log_weights)
 
         # Set initial vmin and vmax
-        self.vmin = 0#self.log_weights_min
+        self.vmin = 0.1#self.log_weights_min
         self.vmax = self.log_weights_max
 
         # Update vmin and vmax inputs
