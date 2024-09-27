@@ -6,6 +6,8 @@
 # Allen Brain Atlas Connectivity Data storage
 
 Allows you to generate connectivity maps of different brain regions of interest.
+Note: The accuracy of these visualizations depends on the quality of the experimental data, which may be subject to certain limitations. For example, injections intended for specific brain regions may inadvertently spread to adjacent areas, leading to unintended labeling and potential overestimation of projection signals. These injection errors can affect the specificity of the observed connectivity patterns, potentially introducing noise or artifacts in the visualized results. Users should interpret the connectivity strengths with caution, keeping in mind that the anatomical precision of injections may vary across experiments.
+
 ### Features:
 
 - Plots the bidirectional connectivity map of each region with each other (n!) and colorcodes it by connection strength.
