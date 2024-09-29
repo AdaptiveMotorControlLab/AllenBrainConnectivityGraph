@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.init_advanced_ui)
 
         # Initialize selected_acronyms
-        self.selected_acronyms = ['VISp', 'VISal', 'RSP', 'SCs', 'MOp', 'MOs']
+        self.selected_acronyms = ['VISp', 'VISa', 'RSP', 'SCs', 'MOp', 'MOs', 'LGd', 'retina']
         # Initialize colormap range values
         self.vmin = 0
         self.vmax = 5

@@ -1,6 +1,6 @@
 # Allen Brain Atlas Connectivity Map
 <p align="center">
-  <img src="data/figure.png" alt="Project Figure">
+  <img src="data/projection_energy_AllConnections_VISp_VISa_RSP_SCs_MOp_MOs_LGd_retina.png" alt="Project Figure">
 </p>
 
 # Allen Brain Atlas Connectivity Data storage
@@ -8,6 +8,9 @@
 Allows you to generate connectivity maps of different brain regions of interest.
 
 **Note**: The accuracy of these visualizations depends on the quality of the experimental data, which may be subject to certain limitations. For example, injections intended for specific brain regions may inadvertently spread to adjacent areas, leading to unintended labeling and potential overestimation of projection signals. These injection errors can affect the specificity of the observed connectivity patterns, potentially introducing noise or artifacts in the visualized results. Users should interpret the connectivity strengths with caution, keeping in mind that the anatomical precision of injections may vary across experiments.
+\\
+Very low connectivity data can be thresholded using vmin in the colormap settings.
+ 
 
 ### Features:
 
